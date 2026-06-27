@@ -60,4 +60,4 @@ Found a bug or have a request? Please [open an issue](../../issues).
 
 ---
 
-<sub>© <year> <your name / org>. Tholos is distributed as-is.</sub>
+<sub>© 2026 Cody Pinto. Tholos is distributed as-is.</sub>
