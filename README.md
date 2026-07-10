@@ -1,18 +1,22 @@
 # Tholos
 
-**A local-first Markdown notebook for Windows.** Organize notes into sections and pages, search everything instantly, lock sensitive sections behind a passphrase, and let an AI agent help — all stored locally on your machine.
+**A local-first Markdown notebook for Windows and Linux.** Organize notes into sections and pages, search everything instantly, lock sensitive sections behind a passphrase, and let an AI agent help — all stored locally on your machine.
 
-> 📦 **This repository hosts the release builds for Tholos.** The application source is maintained privately; this page is for downloading the app and receiving updates.
+> 📦 **This repository hosts the release builds for Tholos.** The application source is maintained privately; this page is for downloading the app.
 
 ---
 
 ## Download & Install
 
-1. Go to the [**Releases**](../../releases/latest) page and download the latest `Tholos-<version>-setup.exe`.
+Grab the build for your platform from the [**Releases**](../../releases/latest) page.
+
+### Windows
+
+1. Download `Tholos-<version>-setup.exe`.
 2. Run the installer. Tholos installs per-user — **no administrator rights required**.
 3. Launch Tholos from the Start Menu or desktop shortcut.
 
-### "Windows protected your PC" warning
+#### "Windows protected your PC" warning
 
 Current builds are **not yet code-signed**, so Windows SmartScreen may warn you on first launch. To proceed:
 
@@ -21,9 +25,22 @@ Current builds are **not yet code-signed**, so Windows SmartScreen may warn you 
 
 This only happens until the app is signed.
 
+### Linux (Debian / Ubuntu)
+
+1. Download `Tholos-<version>-amd64.deb`.
+2. Install it with apt, which pulls in the required GTK/NSS libraries:
+
+   ```sh
+   sudo apt install ./Tholos-<version>-amd64.deb
+   ```
+
+3. Launch Tholos from your application menu, or run `tholos-notes` from a terminal.
+
 ## Updates
 
-Once installed, Tholos checks for new versions and updates itself — you don't need to download installers manually after the first time. Just keep using the app; new releases are applied automatically.
+Tholos does **not** update itself. When a new version ships, download the latest installer from the [Releases](../../releases/latest) page and run it over your existing install — your notebook is stored separately and is left untouched.
+
+Watch this repository (**Watch → Custom → Releases**) to get notified when a new version is published.
 
 ## Features
 
@@ -52,7 +69,8 @@ Tholos is **local-first**. Your notebook is stored in a local database on your c
 
 ## System requirements
 
-- Windows 10 or 11 (64-bit)
+- **Windows** — Windows 10 or 11 (64-bit)
+- **Linux** — a Debian-based x86-64 distribution (Ubuntu 22.04+ or equivalent)
 
 ## Reporting issues
 
