@@ -58,6 +58,7 @@ Watch this repository (**Watch → Custom → Releases**) to get notified when a
 - 📥 **Import / export** — import Markdown files, import a whole folder as a new section, and export back to Markdown.
 - 🤖 **AI agent access** — connect an MCP-compatible client (e.g. Claude Code) to read and edit notes you've opted in.
 - 🧠 **Agent memory** *(new in 0.6.0)* — opt-in: let your agent remember facts and preferences across sessions, with full inspect/forget/clear control in Settings.
+- 📚 **Reference corpora** — index an external repo or docs folder locally; connected agents search it semantically and cite `file:line` instead of re-reading files.
 - 🎨 **Themes** — light/dark, accent color, and density options.
 
 ### Agent memory & the Persona (new in 0.6.0)
@@ -73,7 +74,29 @@ The feature is designed to stay in your hands:
 - **Reviewable in Settings.** List every saved memory, read the Persona, **Forget** individual memories, or **Clear all**.
 - **Local, plain, and per-notebook.** Memories are human-readable files inside your notebook's data folder — nothing is uploaded by Tholos, and each notebook keeps its own independent memory store.
 
+How it works, briefly:
+
+- **The agent is the author.** Your AI client decides what's worth keeping and saves one distilled sentence at a time; Tholos only stores and retrieves — it never sees your conversation.
+- **Recall is hybrid local search** — the same on-device semantic + keyword engine that powers reference corpora (below), so a relevant memory surfaces even when the wording differs.
+- **Plain files on disk.** Memories and the Persona are human-readable files in your notebook's data folder — you can audit them with any text editor.
+- The layered design — atomic memories beneath a single distilled persona, everything human-readable on disk — is inspired by Tencent's open-source [TencentDB-Agent-Memory](https://github.com/Tencent/TencentDB-Agent-Memory); Tholos implements the pattern natively on its own local search stack rather than embedding that project.
+
+Tholos automatically teaches connected agents to use memory well (recall at task start, save distilled facts). To reinforce or customize those habits per-repo, see [docs/CLAUDE.md.example](docs/CLAUDE.md.example).
+
 One trade-off to know: memories are saved by the agent and must stay readable to it, so — unlike locked sections — they are stored **unencrypted** on disk, and anything the agent recalls enters your AI client's context just like a note you've shared. If that trade-off isn't right for you, simply leave Agent memory off.
+
+### Reference corpora — let your agent search a codebase instead of re-reading it
+
+Point Tholos at a repository or docs folder (**Import ▾ → Reference corpora…**) and it builds a local semantic index. A connected agent can then *search* the corpus: one query returns the most relevant passages with `file:line` citations, so its answers stay grounded in the actual source at a fraction of the token cost of reading whole files.
+
+- **Index once, query many times.** Reindex after the source changes — or remove a corpus — from the same dialog.
+- **Fully local and offline.** Embeddings are computed on your machine by a bundled model; nothing is uploaded to build or search an index.
+- **Per-notebook and removable.** Each corpus lives in one folder inside your notebook's data directory — one thing to delete, and deleting it never touches the source.
+- **Never your notes.** Corpora index external folders you choose; Tholos does not build a semantic index over your notebook.
+
+Corpus search is powered by [zvec](https://github.com/alibaba/zvec), an embedded vector database that ships with Tholos as an optional native component — on platforms where it isn't supported, the feature simply reports itself unavailable and the rest of Tholos is unaffected.
+
+Connected agents are told to prefer corpus search automatically; [docs/CLAUDE.md.example](docs/CLAUDE.md.example) shows how to reinforce or customize this in a repo's own instructions.
 
 ### Handy shortcuts
 
@@ -96,6 +119,12 @@ Tholos is **local-first**. Your notebook is stored in a local database on your c
 ## Reporting issues
 
 Found a bug or have a request? Please [open an issue](../../issues).
+
+## Built with
+
+- [zvec](https://github.com/alibaba/zvec) — embedded vector search engine behind reference corpora and memory recall
+- [bge-small-en-v1.5](https://huggingface.co/Xenova/bge-small-en-v1.5) on [transformers.js](https://github.com/huggingface/transformers.js) — fully local, offline embeddings
+- [TencentDB-Agent-Memory](https://github.com/Tencent/TencentDB-Agent-Memory) — design inspiration for the layered agent-memory model
 
 ---
 

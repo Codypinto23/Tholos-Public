@@ -1,0 +1,33 @@
+# Tholos habits for coding agents (optional)
+
+Tholos's MCP server already delivers this guidance to connected agents
+automatically at connect time. Copy these sections into a repo's `CLAUDE.md`
+only to customize them per-repo, or for clients that don't surface server
+instructions.
+
+## Prefer corpus search for understanding
+
+If the `mcp__tholos__search_corpus` / `mcp__tholos__list_corpora` tools are
+available, call `search_corpus` before grepping or reading source files to
+answer "how does X work" / "where is Y handled" questions — one semantic query
+returns the relevant chunks with file:line citations at a fraction of the token
+cost. Fall back to direct file reads when the tools are absent, the corpus
+misses, you need exact current code to **edit** it, or the code may have changed
+since the corpus was indexed. Rule of thumb: corpus search for *understanding*;
+direct file reads for *editing*.
+
+## Agent memory: recall at task start, save distilled facts
+
+If the `mcp__tholos__search_memory` / `read_persona` tools are available, use
+them as habits, not on request:
+
+- **At the start of a task**, call `search_memory` and `read_persona` to recall
+  preferences, conventions, and decisions already settled.
+- **When the user states a durable preference or stable fact**, call
+  `save_memory` with **one distilled sentence** — never a transcript.
+  `forget_memory` anything the user retracts.
+- **As your picture of the user improves**, rewrite the Persona with
+  `update_persona` (whole document, passing the `updatedAt` you read).
+
+If the tools refuse with "agent memory is off", say the user can enable
+**Agent memory** in Tholos Settings — don't silently skip.
