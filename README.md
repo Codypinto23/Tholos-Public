@@ -38,7 +38,12 @@ This only happens until the app is signed.
 
 ## Updates
 
-Tholos does **not** update itself. When a new version ships, download the latest installer from the [Releases](../../releases/latest) page and run it over your existing install — your notebook is stored separately and is left untouched.
+Since v0.5.1, Tholos **updates itself in place**. On launch, the app checks for a newer release, downloads it in the background, and shows an in-app banner when it's ready — nothing installs until you click:
+
+- **Windows** — click **Restart to update** to relaunch into the updater.
+- **Linux** — click **Install update** and your desktop's package installer takes over (it asks for your password as usual).
+
+Running v0.5.0 or older? Those builds have no updater — upgrade once manually from the [Releases](../../releases/latest) page, and every version after that updates in place. Your notebook is stored separately and is never touched by an update.
 
 Watch this repository (**Watch → Custom → Releases**) to get notified when a new version is published.
 
@@ -52,7 +57,23 @@ Watch this repository (**Watch → Custom → Releases**) to get notified when a
 - 🗑️ **Trash** — soft-delete pages and sections, then restore or empty.
 - 📥 **Import / export** — import Markdown files, import a whole folder as a new section, and export back to Markdown.
 - 🤖 **AI agent access** — connect an MCP-compatible client (e.g. Claude Code) to read and edit notes you've opted in.
+- 🧠 **Agent memory** *(new in 0.6.0)* — opt-in: let your agent remember facts and preferences across sessions, with full inspect/forget/clear control in Settings.
 - 🎨 **Themes** — light/dark, accent color, and density options.
+
+### Agent memory & the Persona (new in 0.6.0)
+
+Normally a connected agent starts every session from scratch — you re-explain your preferences each time. With **Agent memory** enabled, an MCP client like Claude Code can save what's worth keeping and recall it in later sessions:
+
+- **Memories** — short, atomic facts the agent distills as you work ("files meeting notes under Work", "prefers terse summaries"), recalled by semantic search at the start of a task.
+- **The Persona** — a single short document describing your stable working style, which the agent refines over time as it gets to know you.
+
+The feature is designed to stay in your hands:
+
+- **Off by default.** Enable it under **Settings → Agent memory**. While it's off, every memory tool call is refused — nothing accumulates without your consent.
+- **Reviewable in Settings.** List every saved memory, read the Persona, **Forget** individual memories, or **Clear all**.
+- **Local, plain, and per-notebook.** Memories are human-readable files inside your notebook's data folder — nothing is uploaded by Tholos, and each notebook keeps its own independent memory store.
+
+One trade-off to know: memories are saved by the agent and must stay readable to it, so — unlike locked sections — they are stored **unencrypted** on disk, and anything the agent recalls enters your AI client's context just like a note you've shared. If that trade-off isn't right for you, simply leave Agent memory off.
 
 ### Handy shortcuts
 
@@ -65,7 +86,7 @@ Watch this repository (**Watch → Custom → Releases**) to get notified when a
 
 ## Privacy & your data
 
-Tholos is **local-first**. Your notebook is stored in a local database on your computer — nothing is uploaded to a server. Locked sections are encrypted at rest and stay encrypted until you unlock them for the session.
+Tholos is **local-first**. Your notebook is stored in a local database on your computer — nothing is uploaded to a server. Locked sections are encrypted at rest and stay encrypted until you unlock them for the session. Agent memory (if you enable it) is also stored locally, in plain human-readable files you can review and delete from Settings at any time.
 
 ## System requirements
 
