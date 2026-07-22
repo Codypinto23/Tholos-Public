@@ -120,6 +120,14 @@ Tholos is **local-first**. Your notebook is stored in a local database on your c
 
 Found a bug or have a request? Please [open an issue](../../issues).
 
+## License & disclaimer
+
+Tholos is distributed under the [MIT License](LICENSE).
+
+**No warranty.** Tholos is provided **"as is"**, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from, out of, or in connection with the software or its use.
+
+**You assume all risk.** You are solely responsible for how you use Tholos and for the safekeeping of your data. That includes keeping **backups of your notebook** and remembering the **passphrases for locked sections** — encrypted content cannot be recovered without its passphrase. Content produced or modified by connected AI agents is your responsibility to review.
+
 ## Built with
 
 - [zvec](https://github.com/alibaba/zvec) — embedded vector search engine behind reference corpora and memory recall
@@ -128,4 +136,4 @@ Found a bug or have a request? Please [open an issue](../../issues).
 
 ---
 
-<sub>© 2026 Cody Pinto. Tholos is distributed as-is.</sub>
+<sub>© 2026 Cody Pinto. Tholos is distributed under the MIT License, as-is and without warranty of any kind.</sub>
