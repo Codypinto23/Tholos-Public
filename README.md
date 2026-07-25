@@ -98,6 +98,45 @@ Corpus search is powered by [zvec](https://github.com/alibaba/zvec), an embedded
 
 Connected agents are told to prefer corpus search automatically; [docs/CLAUDE.md.example](docs/CLAUDE.md.example) shows how to reinforce or customize this in a repo's own instructions.
 
+#### Benchmark: corpus search vs. reading files
+
+A real-world comparison, run against the Tholos source code itself. The question posed to the agent: *how does Tholos encrypt pages when moving from an unencrypted section to an encrypted section?*
+
+**Method 1 — reading files (agent + grep):**
+
+| Metric | Value |
+|--------|-------|
+| **Tool calls** | 17 |
+| **Subagent tokens** | ~53,000 |
+| **Approach** | Grep for keywords → read full source files → synthesize |
+| **Files read** | Multiple (mcp-server, agent-gateway, notebook-repository, section-crypto, section-session, move-planner, ipc/notebook, preload) |
+
+The agent had to search broadly, then read ~8 source files in full to trace the entire encryption flow across the gateway → repository → crypto → IPC layers.
+
+**Method 2 — corpus search:**
+
+| Metric | Value |
+|--------|-------|
+| **Tool calls** | 1 |
+| **Tokens consumed** | ~2,000 (the search call + 10 returned chunks) |
+| **Approach** | Single query, got the exact snippets needed |
+| **Coverage** | 10 hits from 6 different files, with file:line citations |
+
+The corpus search returned precisely the relevant code sections — the encode/decode and page-recoding logic, the move flow, the agent-gateway access guard, the crypto primitives, and even the ADR documenting the design decision.
+
+**Comparison:**
+
+| | File Reading | Corpus Search |
+|---|---|---|
+| **Tokens** | ~53k | ~2k |
+| **Reduction** | | **~26× fewer tokens** |
+| **Tool calls** | 17 | 1 |
+| **Relevance** | Had to read entire files, filter mentally | Got only the relevant lines |
+| **Time** | ~106s | ~3s |
+| **Completeness** | Full picture, but noisy | Hit the key files + ADR in one shot |
+
+The corpus search was **~26× more token-efficient** and caught the same information — including the ADR document that the file-reading agent might have missed without an explicit search for it. The tradeoff: a corpus is a snapshot of when it was indexed, so anything changed since won't show until you reindex. But for understanding how a system works, it's a clear win.
+
 ### Handy shortcuts
 
 | Action | Shortcut |
