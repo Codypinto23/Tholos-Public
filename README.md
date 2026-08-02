@@ -1,4 +1,13 @@
-# Tholos
+<h1 align="center">
+  Tholos
+  <img
+    src="https://github.com/user-attachments/assets/2e2c6b20-6cb8-4a05-9afc-e20e7b663ee3"
+    alt="Tholos icon"
+    width="36"
+    height="36"
+    valign="middle"
+  />
+</h1>
 
 **A local-first Markdown notebook for Windows and Linux.** Organize notes into sections and pages, search everything instantly, lock sensitive sections behind a passphrase, and let an AI agent help — all stored locally on your machine.
 
