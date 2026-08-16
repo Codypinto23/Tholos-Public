@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tholos — Security Review</title>
+<!-- ============================================================
+     Standalone rendering of docs/security/security-review.md.
+     Self-contained ON PURPOSE: no external fonts, scripts, styles, or
+     images — this page makes offline-by-design claims and must embody
+     them. Update alongside the markdown; the markdown is canonical.
+     ============================================================ -->
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --bg-raised: #f2f3f8;
+    --ink: #1c2130;
+    --ink-soft: #4c5468;
+    --ink-faint: #7d8496;
+    --line: #dcdfe8;
+    --accent: #4a6cc4;
+    --accent-soft: #e7ecf9;
+    --ok: #23764a;
+    --ok-soft: #e0f0e6;
+    --warn: #96650f;
+    --warn-soft: #f7edd8;
+    --neutral-chip: #e8e9ee;
+    --code-bg: #eef0f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161d;
+      --bg-raised: #1b1e28;
+      --ink: #e6e9f2;
+      --ink-soft: #aab1c4;
+      --ink-faint: #767e93;
+      --line: #2c3040;
+      --accent: #8fa8ef;
+      --accent-soft: #232a41;
+      --ok: #63c98a;
+      --ok-soft: #1c2f24;
+      --warn: #d9a94e;
+      --warn-soft: #322817;
+      --neutral-chip: #262a37;
+      --code-bg: #20242f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161d;
+    --bg-raised: #1b1e28;
+    --ink: #e6e9f2;
+    --ink-soft: #aab1c4;
+    --ink-faint: #767e93;
+    --line: #2c3040;
+    --accent: #8fa8ef;
+    --accent-soft: #232a41;
+    --ok: #63c98a;
+    --ok-soft: #1c2f24;
+    --warn: #d9a94e;
+    --warn-soft: #322817;
+    --neutral-chip: #262a37;
+    --code-bg: #20242f;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 0 24px 96px; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  code, pre {
+    font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+  }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 16px 20px; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+  pre code { background: none; padding: 0; }
+
+  /* ---- header ---- */
+  header { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(30px, 5vw, 42px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 18px; text-wrap: balance; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+  .meta span {
+    font-size: 13px; color: var(--ink-soft); background: var(--bg-raised);
+    border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px;
+  }
+  .meta span b { color: var(--ink); font-weight: 600; }
+  header .lede { max-width: 76ch; color: var(--ink-soft); margin: 0; }
+
+  /* ---- table of contents ---- */
+  nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 24px; padding: 28px 0; border-bottom: 1px solid var(--line); }
+  nav.toc a { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; text-decoration: none; color: var(--ink); font-size: 14.5px; }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc .n { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--ink-faint); min-width: 1.6em; }
+
+  /* ---- sections ---- */
+  section { padding-top: 48px; }
+  h2 { font-size: 25px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 4px; display: flex; gap: 14px; align-items: baseline; text-wrap: balance; }
+  h2 .n { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; color: var(--accent); }
+  h3 { font-size: 18px; font-weight: 650; margin: 30px 0 6px; letter-spacing: -0.01em; }
+  p, ul, ol { max-width: 76ch; }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 1.4em; margin: 12px 0; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--ink-faint); }
+  strong { font-weight: 650; }
+
+  .callout {
+    max-width: 76ch; margin: 18px 0; padding: 14px 18px;
+    background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0;
+  }
+  .callout p { margin: 0; }
+
+  /* ---- tables ---- */
+  .tbl { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-top: 1px solid var(--line); }
+  thead th {
+    border-top: none; background: var(--bg-raised); font-size: 12px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap;
+  }
+  td:first-child { white-space: nowrap; }
+  tbody tr:hover { background: color-mix(in srgb, var(--bg-raised) 55%, transparent); }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  /* ---- status chips ---- */
+  .chip {
+    display: inline-block; font-size: 11.5px; font-weight: 650; letter-spacing: 0.05em;
+    text-transform: uppercase; border-radius: 99px; padding: 2px 10px; white-space: nowrap;
+  }
+  .chip.ok { color: var(--ok); background: var(--ok-soft); }
+  .chip.warn { color: var(--warn); background: var(--warn-soft); }
+  .chip.neutral { color: var(--ink-soft); background: var(--neutral-chip); }
+
+  .objective { max-width: none; list-style: none; padding-left: 0; }
+  .objective li { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); margin: 0; }
+  .objective li:first-child { border-top: none; }
+  .objective .oid { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; color: var(--accent); }
+  .objective .otext { max-width: 90ch; }
+
+  footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-faint); }
+  footer p { margin: 6px 0; }
+
+  @media print {
+    body { font-size: 12px; }
+    nav.toc { display: none; }
+    .tbl { border: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Tholos Notes</p>
+    <h1>Security Review</h1>
+    <div class="meta">
+      <span><b>Version reviewed</b> post-hardening, 2026-08-15</span>
+      <span><b>Findings register</b> §8, statuses current</span>
+      <span><b>Canonical source</b> <code>docs/security/security-review.md</code></span>
+    </div>
+    <p class="lede">
+      This document is written for an external security reviewer. Every claim cites the file
+      (and where useful the line) that implements it, so the review can be verified against
+      source rather than taken on faith. This page is a standalone rendering of the repository's
+      markdown report — and is itself self-contained: it loads no external fonts, scripts, or
+      images, because a security page for an offline-by-design app should hold to the same rule.
+    </p>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#s1"><span class="n">1</span> Executive summary</a>
+    <a href="#s2"><span class="n">2</span> Architecture &amp; trust boundaries</a>
+    <a href="#s3"><span class="n">3</span> Threat model</a>
+    <a href="#s4"><span class="n">4</span> Third-party &amp; native code</a>
+    <a href="#s5"><span class="n">5</span> MCP / agent access</a>
+    <a href="#s6"><span class="n">6</span> Cryptography</a>
+    <a href="#s7"><span class="n">7</span> Electron hardening</a>
+    <a href="#s8"><span class="n">8</span> Findings register</a>
+    <a href="#s9"><span class="n">9</span> Ongoing assurance</a>
+    <a href="#s10"><span class="n">10</span> Appendices &amp; reporting</a>
+  </nav>
+
+  <section id="s1">
+    <h2><span class="n">1</span> Executive summary</h2>
+    <p>
+      Tholos is a <strong>local-first, offline-by-design</strong> Electron notebook (React renderer,
+      Node main process, SQLite store) with two optional security-relevant features: per-section
+      encryption at rest (&ldquo;Locked Sections&rdquo;) and a <strong>local MCP server</strong> that lets an AI
+      coding agent (e.g. Claude Code) read and write explicitly allowlisted notes.
+    </p>
+    <div class="callout"><p>
+      The trust model in three sentences: the machine's OS user account is the trust boundary —
+      any same-user process is assumed benign except where encryption extends protection to data
+      at rest. All <em>content</em> (notes, pasted clipboard data, imported documents, indexed corpora)
+      is treated as untrusted input. The AI agent is treated as a confused deputy: potentially
+      hijacked by injected content, so the tool surface it reaches is capability-scoped and
+      structurally unable to execute code or reach the network.
+    </p></div>
+    <ul>
+      <li><strong>Runtime network egress is a single, well-defined channel</strong>: the update check against
+        GitHub Releases. Nothing else in the packaged app touches the network — fonts are bundled,
+        embeddings run from a local model pinned offline, and there is no telemetry of any kind (§4.4).</li>
+      <li><strong>The MCP surface satisfies Meta's Rule of Two</strong> with a structural argument, not a policy
+        one: the server exposes zero network-capable and zero code-executing tools, so the
+        &ldquo;external communication&rdquo; leg cannot be closed from inside Tholos (§5).</li>
+      <li><strong>The cryptography is a small, sound core</strong>: AES-256-GCM + Argon2id at OWASP parameters,
+        keys confined to main-process memory and zeroized; the improvements this review identified —
+        envelope versioning, AAD address binding, residue scrubbing — are now implemented as
+        envelope v2 (ADR-0019, F-2 remediated, §6).</li>
+      <li><strong>Release integrity (F-1) is remediated</strong>: releases are CI-built and staged as drafts,
+        Windows installers are Authenticode-signed during packaging via Azure Trusted Signing
+        (short-lived certificates over repo-federated OIDC — no signing key exists to steal), and
+        shipped binaries validate their asar against a hash embedded at build time (Windows/macOS).
+        Documented residuals, all Linux-shaped: no asar validation (dpkg checksums only), no
+        independent <code>.deb</code> signature (update-channel integrity there rests on HTTPS plus a
+        sha512 manifest shipped from the same feed), and on Windows the unpacked set is covered by
+        the installer signature rather than the asar hash.</li>
+    </ul>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">2</span> Architecture &amp; trust boundaries</h2>
+<pre aria-label="Architecture diagram"><code>┌─────────────────────────────── OS user account ───────────────────────────────┐
+│                                                                               │
+│  ┌─ Renderer (Chromium, sandboxed) ─┐      ┌─ Main process (Node) ──────────┐ │
+│  │ React UI, CodeMirror, Preview    │ IPC  │ SQLite (node:sqlite), crypto,  │ │
+│  │ contextIsolation, no Node,       │◄────►│ settings, IPC handlers,        │ │
+│  │ strict CSP, html:false markdown  │      │ tholos-asset protocol          │ │
+│  └──────────────────────────────────┘      │        │                       │ │
+│         ▲ tholos-asset:// (attachments)    │        ├─► utilityProcess fork │ │
+│         └──────────────────────────────────┤        │   (corpus indexing)   │ │
+│                                            │        └─► MCP HTTP server     │ │
+│  ┌─ MCP client (Claude Code) ─┐  loopback  │            (127.0.0.1, bearer) │ │
+│  │ holds its own tool surface │◄──────────►│                                │ │
+│  └────────────────────────────┘   HTTP     └───────────────┬────────────────┘ │
+│                                                            │                  │
+│  Data at rest: &lt;userData&gt;/tholos.db, settings.json,        │ HTTPS (only      │
+│                corpora/, memory/                           ▼ runtime egress)  │
+└──────────────────────────────────────────────── GitHub Releases (updates) ────┘</code></pre>
+    <p>
+      Renderer hardening: <code>contextIsolation: true</code>, <code>nodeIntegration: false</code>,
+      <code>sandbox: true</code> (<code>src/main/index.js</code>), a strict CSP injected into the built page
+      (<code>electron.vite.config.mjs</code>), and a preload that exposes only fixed-name wrappers —
+      never <code>ipcRenderer</code> itself (<code>src/preload/index.js</code>).
+    </p>
+    <h3>Data at rest</h3>
+    <p><code>&lt;userData&gt;</code> is <code>~/.config/tholos-notes/</code> on Linux, <code>%APPDATA%\tholos-notes\</code> on
+      Windows; dev builds use a <code>-dev</code> sibling.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Path</th><th>Content</th><th>Protection</th></tr></thead>
+      <tbody>
+        <tr><td><code>tholos.db</code> (+ WAL)</td><td>Notes. Plaintext TEXT for normal sections; AES-256-GCM envelopes for Locked Sections</td><td>Encryption per section, opt-in (ADR-0004)</td></tr>
+        <tr><td><code>settings.json</code></td><td>Preferences, window bounds, MCP config incl. bearer token</td><td>Token encrypted via OS credential store (F-3 remediated); rest plaintext</td></tr>
+        <tr><td><code>corpora/</code></td><td>Vector index + registry of user-registered external repos/docs</td><td>Plaintext by design</td></tr>
+        <tr><td><code>memory/</code></td><td>Agent memories + persona</td><td>Plaintext by design, documented (ADR-0017)</td></tr>
+      </tbody>
+    </table></div>
+    <p>
+      Locked-page content is additionally excluded from the FTS index so no decrypted index is
+      ever written to disk (<code>src/main/search/search-index.mjs</code>, ADR-0003).
+    </p>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">3</span> Threat model</h2>
+
+    <h3>3.1 Assets</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>ID</th><th>Asset</th><th>Sensitivity</th></tr></thead>
+      <tbody>
+        <tr><td>S1</td><td>Locked Section content (pages, attachments)</td><td>Highest — encrypted at rest, no recovery</td></tr>
+        <tr><td>S2</td><td>Section passphrases &amp; derived keys</td><td>Highest — compromise breaks S1</td></tr>
+        <tr><td>S3</td><td>Unlocked note content</td><td>High — user's working notes, plaintext on disk by design</td></tr>
+        <tr><td>S4</td><td>Agent memories &amp; persona</td><td>High — a distilled profile of the user, plaintext by design</td></tr>
+        <tr><td>S5</td><td>Indexed corpus content</td><td>Medium–high — mirrors external repos/docs the user registered</td></tr>
+        <tr><td>S6</td><td>MCP bearer token</td><td>Medium — grants the full tool surface on loopback</td></tr>
+        <tr><td>S7</td><td>Application/installer integrity (incl. update channel)</td><td>Critical — subverts everything above</td></tr>
+        <tr><td>S8</td><td>Availability of the app and host</td><td>Medium</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>3.2 Attackers &amp; entry points</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>ID</th><th>Attacker</th><th>Entry point</th></tr></thead>
+      <tbody>
+        <tr><td>A1</td><td><strong>Malicious content author</strong> — anyone whose text reaches the app: a crafted note, pasted web content, an imported markdown folder, a document in a registered corpus</td><td>Markdown Preview, smart paste, importers, corpus indexer — and <em>through the agent</em>, prompt-injected tool calls</td></tr>
+        <tr><td>A2</td><td><strong>Co-resident same-user process</strong></td><td>Reads <code>&lt;userData&gt;</code> files (token, DB); connects to the loopback MCP port</td></tr>
+        <tr><td>A3</td><td><strong>Offline disk/device thief</strong></td><td>Reads <code>tholos.db</code>, WAL, <code>memory/</code>, <code>settings.json</code> at rest</td></tr>
+        <tr><td>A4</td><td><strong>Supply-chain attacker</strong> — compromised npm package, tampered build-time model download, or control of the GitHub account behind the update feed</td><td><code>pnpm install</code>, <code>pnpm build</code>, auto-update</td></tr>
+        <tr><td>A5</td><td><strong>Network MITM</strong></td><td>The update check (previously also the font CDN fetch — removed in R-1)</td></tr>
+        <tr><td>A6</td><td><strong>Malicious/compromised MCP client</strong> — includes a legitimate client hijacked by injected content (A1→A6 is the expected composition)</td><td>The MCP tool surface (HTTP or stdio)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>3.3 Security objectives (STEAM)</h3>
+    <p>Each objective names the <strong>T</strong>hreat violated, the <strong>E</strong>ntry point / <strong>A</strong>ttacker,
+      the <strong>A</strong>sset, and a <strong>M</strong>easure of required strength.</p>
+    <ul class="objective">
+      <li><span class="oid">O1</span><span class="chip ok">Met</span><span class="otext">Locked Section content (S1) must not be recoverable in plaintext by an attacker with full read access to the on-disk database (A2/A3), withstanding offline brute force to the strength of AES-256-GCM under Argon2id-derived keys at ≥ OWASP-recommended parameters with a random 16-byte per-section salt. <em>Pre-lock plaintext residue is scrubbed after the lock transition (F-2 remediated, ADR-0019); filesystem-level remanence remains out of userland reach.</em></span></li>
+      <li><span class="oid">O2</span><span class="chip ok">Met</span><span class="otext">Section Keys and passphrases (S2) must not be disclosed to a compromised renderer (A1): keys exist only in main-process memory, are zeroized on lock/relock/quit, and never cross IPC — only decrypted content returns.</span></li>
+      <li><span class="oid">O3</span><span class="chip ok">Met</span><span class="otext">Malicious note content (A1 via the Preview) must not achieve code execution or host file access, to the combined strength of the Chromium sandbox + contextIsolation + no nodeIntegration + strict CSP + <code>html:false</code> markdown rendering with dangerous-scheme link filtering.</span></li>
+      <li><span class="oid">O4</span><span class="chip ok">Met</span><span class="otext">The renderer must never name a filesystem path: every path originates in a native dialog or a main-issued single-use opaque token, with export filenames sanitized.</span></li>
+      <li><span class="oid">O5</span><span class="chip ok">Met</span><span class="otext">A prompt-injected agent (A6, composed from A1) must not exfiltrate notes/memories or execute code through Tholos, to the strength of structural absence: zero network-capable and zero code-executing tools, verified by the enumeration in §5.2.</span></li>
+      <li><span class="oid">O6</span><span class="chip ok">Met</span><span class="otext">The MCP HTTP endpoint must reject any caller without the bearer token: a 256-bit random token compared in constant time <em>before</em> any dispatch, on a loopback-only socket with DNS-rebinding protection and no CORS.</span></li>
+      <li><span class="oid">O7</span><span class="chip ok">Met</span><span class="otext">Locked Sections must be unreachable through the agent surface regardless of configuration mistakes, by construction: the agent gateway is built with no key session, so it cannot decrypt even if asked.</span></li>
+      <li><span class="oid">O8</span><span class="chip warn">Partial</span><span class="otext">The auto-update channel must not allow substitution of a malicious installer. Met on Windows: HTTPS + sha512 pinning, CI-built draft-staged releases with signing mandatory for tag builds, Authenticode signing via Azure Trusted Signing (OIDC-federated, no exportable key). Weaker on Linux: the <code>.deb</code> carries no independent signature and its sha512 manifest ships from the same feed — feed compromise (A4) replaces both together. Documented F-1 residual.</span></li>
+      <li><span class="oid">O9</span><span class="chip ok">Met</span><span class="otext">Code shipped to users must match reviewed source: sha512-integrity lockfile, 7-day cooling-off window, per-package build-script approvals, guarded installs, pinned model digests, and embedded asar integrity validation on Windows/macOS — the installer signature is the unpacked set's tamper evidence (F-1 remediated; Linux asar validation remains a documented gap).</span></li>
+      <li><span class="oid">O10</span><span class="chip ok">Met</span><span class="otext">Parsers of untrusted bytes must not crash or hang the app, demonstrated continuously by two-tier fuzzing in CI — property suites on every PR plus coverage-guided nightly runs (§9).</span></li>
+      <li><span class="oid">O11</span><span class="chip ok">Met</span><span class="otext">User content must not leave the machine at runtime: zero runtime egress besides the update check — fonts self-hosted, embedding model bundled and pinned offline, no telemetry, remote images in notes blocked by CSP.</span></li>
+    </ul>
+
+    <h3>3.4 Attack vectors → mitigations</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Vector (attacker)</th><th>Mitigation</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>Markdown/HTML injection (A1)</td><td><code>html: false</code>, dangerous-scheme <code>validateLink</code>, strict CSP, fuzzed no-foothold invariant</td><td><code>markdown-render.mjs</code>; <code>test/fuzz-markdown.test.mjs</code></td></tr>
+        <tr><td>Malicious link click (A1)</td><td><code>http/https/mailto</code> allowlist on <code>shell.openExternal</code>; <code>file:</code> navigation pinned to the app document</td><td><code>src/main/open-external.mjs</code></td></tr>
+        <tr><td>Malicious corpus document (A1)</td><td>Extension allowlist, size caps, zip-bomb/password/corrupt → classified skips, symlinks never index, macros never executed, extraction fuzzed; indexing isolated in a short-lived <code>utilityProcess</code></td><td><code>corpus-walk.mjs</code>; <code>index-worker.mjs</code></td></tr>
+        <tr><td>Prompt injection → agent misuse (A1→A6)</td><td>Rule-of-Two structural argument (§5); per-section opt-in; Locked Sections keyless; undo snapshot + per-call audit log on agent writes</td><td><code>agent-gateway.mjs</code>; <code>audit-log.mjs</code></td></tr>
+        <tr><td>Loopback port abuse / DNS rebinding (A2)</td><td>Bearer-before-dispatch (constant-time), loopback bind, <code>allowedHosts</code>/<code>allowedOrigins</code>, no CORS, 4&nbsp;MiB body cap</td><td><code>mcp-http-server.mjs</code></td></tr>
+        <tr><td>Token theft from disk (A2)</td><td>Token encrypted via OS credential store; masked in UI with reveal-on-demand; per-call audit log</td><td>F-3 (remediated)</td></tr>
+        <tr><td>Cold-disk reading (A3)</td><td>Locked Sections encrypted (O1); everything else plaintext <strong>by documented design</strong></td><td>ADR-0004/0017</td></tr>
+        <tr><td>Malicious npm package (A4)</td><td>Integrity-hashed lockfile, 7-day cooling window, build-script approvals, guarded installs, no project postinstalls</td><td><code>pnpm-workspace.yaml</code></td></tr>
+        <tr><td>Tampered model download (A4)</td><td>SHA-256 pin table verified at build for downloaded <em>and</em> cached files</td><td><code>scripts/model-digests.mjs</code></td></tr>
+        <tr><td>Malicious update feed / MITM (A4/A5)</td><td>HTTPS + sha512 manifest; user-triggered install; CI-built draft-staged releases; Authenticode-signed Windows installers (Azure Trusted Signing; <strong>Linux <code>.deb</code> unsigned — residual</strong>)</td><td><code>updater.mjs</code>; <code>release.yml</code>; F-1</td></tr>
+        <tr><td>Renderer→main escalation (A1)</td><td>Sandbox, contextIsolation, minimal typed IPC, no path parameters, deny-all-but-clipboard-write permission handler</td><td><code>src/preload/index.js</code>; <code>src/main/ipc/*</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>3.5 Accepted risks</h3>
+    <ul>
+      <li><strong>Same-user local processes are inside the trust boundary</strong> — no process attestation on loopback; the bearer token gates <em>accidental</em> exposure, not a determined same-user attacker (narrowed by F-3's keychain storage and audit log).</li>
+      <li><strong>Unlocked sections, corpora, and agent memory are plaintext at rest by design</strong> — documented and surfaced in the UI; users who need at-rest protection use Locked Sections (which the agent then cannot read at all).</li>
+      <li><strong>The stdio MCP transport trusts its spawner</strong> — inherent to stdio; the registration command is user-run, and the HTTP transport is the recommended path.</li>
+      <li><strong>Build-time network is accepted; runtime network is not</strong> — model download and dependency installs happen at build, guarded by digests, lockfile integrity, and the cooling window.</li>
+      <li><strong><code>style-src 'unsafe-inline'</code></strong> remains in the CSP (React/CodeMirror inline styles); <code>script-src</code> is strict, which is where execution risk lives.</li>
+      <li><strong>Remote images in notes no longer load</strong> (CSP) — a deliberate tracking-pixel defense, at the cost of remote-image convenience.</li>
+    </ul>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">4</span> Third-party &amp; native code</h2>
+    <p>
+      The Electron analog of a native app's DLL surface is <strong>N-API addons + WASM blobs + the
+      Electron runtime itself</strong>. Tholos's is small, fully enumerated, and — crucially — the core
+      app runs with <strong>zero</strong> required native addons: SQLite is Node's built-in
+      <code>node:sqlite</code>, and Argon2id is the pure-JS, audited <code>@noble/hashes</code>.
+    </p>
+    <h3>4.1 Native/WASM inventory</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Module</th><th>Kind</th><th>Purpose</th><th>Loading</th></tr></thead>
+      <tbody>
+        <tr><td><code>@zvec/zvec</code></td><td>N-API prebuilds</td><td>Local vector store (corpus search, agent memory)</td><td>Lazy <code>import()</code> at one integration point; failure degrades to feature-off</td></tr>
+        <tr><td><code>onnxruntime-node</code></td><td>N-API prebuild</td><td>Local embedding inference</td><td>Lazy, corpus features only</td></tr>
+        <tr><td><code>sharp</code> + libvips</td><td>Native</td><td>Image codecs pulled in by transformers; <strong>no Tholos code path feeds it</strong> (text-only pipeline)</td><td>Transitive</td></tr>
+        <tr><td><code>@hyzyla/pdfium</code></td><td>WASM (Chrome's PDF engine)</td><td>PDF text extraction for corpora</td><td>Lazy</td></tr>
+      </tbody>
+    </table></div>
+    <p>
+      All are <code>optionalDependencies</code> — the notebook works fully without them. All load from
+      <strong>static string literals</strong>: a repo-wide search finds <strong>no <code>eval</code>, no
+      <code>new Function</code>, no <code>node:vm</code>, and no computed module paths</strong> in shipped code.
+      Process creation is similarly bounded: an <code>execFile</code> of the <code>claude</code> CLI with a fixed
+      argv and no shell, and a <code>utilityProcess.fork</code> of the bundled corpus-index worker with a
+      fixed job shape. The &ldquo;generate from repo&rdquo; flow builds a command string for the <em>user</em> to
+      run — Tholos executes nothing.
+    </p>
+    <h3>4.2 Supply-chain controls</h3>
+    <ul>
+      <li><code>pnpm-lock.yaml</code> with sha512 integrity for every package; pinned <code>packageManager</code>; CI installs <code>--frozen-lockfile</code>.</li>
+      <li><strong>7-day cooling-off window</strong> on every new package version (<code>minimumReleaseAge</code>) — the standard defense against freshly-poisoned releases.</li>
+      <li><strong>Per-package build-script approvals</strong>: dependency postinstalls blocked by default; five deliberately allowed, each with a written reason.</li>
+      <li><strong>Socket Firewall</strong> wraps installs; the project itself has <strong>no install hooks</strong> of any kind.</li>
+      <li>The bundled embedding model is verified against <strong>pinned SHA-256 digests</strong> at build time, for fresh downloads and cached files alike.</li>
+      <li>Runtime dependency advisories: <strong>one</strong> remains (sharp/libvips, exposure analysis in the scan appendix); the rest were eliminated by security-floor overrides and the Electron bump.</li>
+    </ul>
+    <h3>4.3 Packaging &amp; update channel — the honest gap</h3>
+    <p>
+      Updates come from GitHub Releases via <code>electron-updater</code>: HTTPS transport, sha512
+      manifest pinning, background download, <strong>user-triggered</strong> install. Registered as
+      <strong>F-1</strong>, now closed: releases are <strong>CI-built and CI-staged</strong> (draft
+      releases on the public feed; publishing is the one human act); Windows installers are
+      <strong>Authenticode-signed inside the packaging step</strong> via Azure Trusted Signing
+      (short-lived certificates over repo-federated OIDC — no signing key exists to steal;
+      RFC-3161 timestamped so signatures outlive the certificates); and the packaged binary
+      carries <strong>embedded asar integrity validation</strong> plus asar-only app loading with
+      <code>NODE_OPTIONS</code>/<code>--inspect</code> disabled via Electron fuses. Documented residuals:
+      asar integrity is enforced on Windows/macOS only (Electron implements no Linux validation —
+      a <code>.deb</code> install's tamper evidence is dpkg's install-time checksums), and everything
+      under <code>app.asar.unpacked</code> — the dependency tree plus the app-owned MCP server and
+      converter bundles (unpacked because <code>ELECTRON_RUN_AS_NODE</code> cannot read the asar) —
+      is covered by the installer signature at install time rather than the asar hash. The
+      <code>.deb</code> itself is unsigned (no Linux code-signing analog is wired): Linux
+      update-channel authenticity rests on HTTPS plus a sha512 manifest served from the same feed.
+    </p>
+    <h3>4.4 Runtime network egress — complete list</h3>
+    <div class="callout"><p>
+      1. Update check against GitHub Releases on packaged launch. <strong>That is the entire list.</strong>
+      Fonts are self-hosted; the embedder is pinned <code>allowRemoteModels = false</code> with a bundled
+      model; there is no telemetry, crash reporting, or analytics; the MCP server <em>listens</em> on
+      loopback and originates nothing.
+    </p></div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">5</span> MCP / agent access — Rule of Two</h2>
+    <p>
+      Meta's Rule of Two: an agent must not simultaneously hold all three of <strong>(a)</strong> access to
+      sensitive data, <strong>(b)</strong> ability to communicate externally, <strong>(c)</strong> exposure to
+      untrusted input. Tholos grants (a) and (c) in a scoped way and <strong>structurally withholds
+      (b)</strong>: no tool it exposes can reach the network, touch arbitrary files, or execute code.
+      An injected agent can corrupt what it can write (mitigated by undo snapshots, the audit
+      log, and opt-in scope) but cannot use Tholos as an exfiltration or execution channel.
+    </p>
+    <h3>5.1 Transports</h3>
+    <ul>
+      <li><strong>Streamable HTTP (recommended)</strong> — in-process, <code>127.0.0.1</code> only, single <code>/mcp</code> POST endpoint. Gates, in order: bearer token (256-bit random, constant-time compare, 401 before any parsing), DNS-rebinding protection, no CORS, 4&nbsp;MiB body cap, stateless per-request server instances. Off by default; every tool call lands in the append-only audit log.</li>
+      <li><strong>stdio (legacy/fallback)</strong> — a separate process registered via <code>claude mcp add</code>; trusts its spawner (accepted risk §3.5) and receives a <em>smaller</em> surface: no memory tools, no reindex.</li>
+    </ul>
+    <h3>5.2 Complete tool inventory (17 HTTP / 10 stdio)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Tool</th><th>Reads</th><th>Writes</th><th>FS beyond <code>&lt;userData&gt;</code></th><th>Exec</th><th>Network</th></tr></thead>
+      <tbody>
+        <tr><td><code>list_sections</code>, <code>list_pages</code>, <code>search</code></td><td>Metadata/FTS of Agent-Access, non-locked sections only</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>read_page</code></td><td>Full body, Agent-Access sections only</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>create_section</code></td><td>—</td><td>New section (auto-granted Agent Access — noted risk)</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>create_page</code>, <code>rename_page</code></td><td>Parent checks</td><td>Page rows; rename requires <code>expectedUpdatedAt</code></td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>update_page</code></td><td>—</td><td>Whole-body replace; prior body kept as an undo snapshot surfaced in the UI</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>list_corpora</code></td><td>Registry names/status (never the source path)</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>search_corpus</code></td><td>Vector+FTS query over an indexed corpus</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>reindex_corpus</code> (HTTP only)</td><td>—</td><td>Rebuilds a corpus index</td><td>reads the <strong>user-registered</strong> source dir, via a bounded worker fork</td><td>fixed bundled worker only</td><td>no</td></tr>
+        <tr><td><code>save_memory</code>, <code>search_memory</code>, <code>list_memories</code>, <code>forget_memory</code> (HTTP only)</td><td>Memory store</td><td>Memory store (length-capped)</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>read_persona</code>, <code>update_persona</code> (HTTP only)</td><td><code>persona.md</code></td><td>Whole-doc rewrite, 64&nbsp;KiB cap, optimistic concurrency</td><td>no</td><td>no</td><td>no</td></tr>
+      </tbody>
+    </table></div>
+    <p>No resources, no prompts, no sampling capability — tools only.</p>
+    <h3>5.3 Scoping &amp; gating</h3>
+    <ul>
+      <li><strong>Agent Access is per-section, off by default</strong>, enforced on every call in the gateway — not in the UI.</li>
+      <li><strong>Locked Sections are excluded by construction</strong> (O7): the gateway holds no key session, so agent-facing reads of encrypted rows are impossible, not merely forbidden.</li>
+      <li><strong>Agent memory is off by default</strong> and enforced per-call with a live settings read, so disabling it takes effect immediately.</li>
+      <li><strong>Embeddings are local-only by construction</strong> — remote model fetch disabled in every process that embeds.</li>
+      <li><strong>Every HTTP tool call is audited</strong> (F-3): timestamp, transport, tool, target ids, outcome — never content — appended to <code>userData/mcp-audit.log</code>. The legacy stdio transport is <em>not</em> audited: it inherently trusts its spawner (accepted risk §3.5).</li>
+    </ul>
+    <h3>5.4 Candid limitations (all registered)</h3>
+    <ul>
+      <li><strong>Memory/persona persistence is a prompt-injection channel</strong>: content laundered from an untrusted corpus into <code>save_memory</code> re-enters context in later sessions. Bounded by size caps, the off-by-default toggle, the Memory UI making entries visible/deletable, and the audit trail.</li>
+      <li><code>create_section</code> self-grants Agent Access to sections the agent itself creates — a bounded, visible expansion.</li>
+      <li>Corpus chunk text is returned verbatim, unfenced — injection-aware clients should treat it as data.</li>
+      <li>Where no OS keychain exists (a bare Linux session), bearer-token storage falls back to plaintext — surfaced in Settings, not silent.</li>
+    </ul>
+  </section>
+
+  <section id="s6">
+    <h2><span class="n">6</span> Cryptography</h2>
+    <p>
+      Scope: one purpose (Locked Section confidentiality at rest), one file of primitives
+      (<code>src/main/crypto/section-crypto.mjs</code>), no custom constructions. Design record: ADR-0004.
+    </p>
+    <div class="tbl"><table>
+      <thead><tr><th>Element</th><th>Choice</th></tr></thead>
+      <tbody>
+        <tr><td>AEAD</td><td>AES-256-GCM, 96-bit random IV <strong>per encryption call</strong>, 128-bit tag, decipher pinned to <code>authTagLength: 16</code></td></tr>
+        <tr><td>KDF</td><td>Argon2id (<code>@noble/hashes</code>), m=19&nbsp;MiB, t=2, p=1 (OWASP minimum for interactive use), 32-byte output</td></tr>
+        <tr><td>Salt</td><td>16 random bytes <strong>per section</strong></td></tr>
+        <tr><td>Envelope</td><td>v2 (ADR-0019): <code>ver(0x02) ‖ iv ‖ tag ‖ ct</code> with the envelope's section/page/field address as GCM AAD; Argon2id cost stored per section, validated + bounded before deriving. Legacy v1 is read-only and migrates on first unlock</td></tr>
+        <tr><td>Passphrase check</td><td>GCM canary: a fixed string encrypted at lock time; wrong passphrase = tag failure — <strong>no plaintext verifier stored</strong></td></tr>
+        <tr><td>Key lifecycle</td><td>Derived in main, held only in an in-memory map, zeroized on lock/relock/replace/quit, never crosses IPC</td></tr>
+        <tr><td>Randomness</td><td><code>node:crypto</code> only; <strong>no <code>Math.random()</code> anywhere in <code>src/</code></strong></td></tr>
+      </tbody>
+    </table></div>
+    <p>
+      Correctness is exercised by the unit suite and by property fuzzing: round-trip fidelity,
+      <em>any</em> bit flip anywhere in the envelope throws, truncation at every byte offset throws,
+      wrong keys throw, and the canary check is total.
+    </p>
+    <p>
+      <strong>F-2 improvements — implemented (ADR-0019)</strong>: an envelope version byte with
+      per-section stored KDF params (crypto agility; validated and bounded before deriving, since
+      stored params are unauthenticated by construction), AAD binding each envelope to its
+      section/page/field address (intra-section envelope transplants fail the auth tag), and
+      verified residue scrubbing (<code>secure_delete</code> + checkpoint/VACUUM with a persisted
+      retry marker) after plaintext→ciphertext transitions. v1 sections migrate lazily on first
+      unlock. Documented residuals: same-address replay, filesystem-level remanence, and an app
+      downgrade reading migrated sections as &ldquo;wrong passphrase&rdquo; until re-upgraded.
+    </p>
+  </section>
+
+  <section id="s7">
+    <h2><span class="n">7</span> Electron platform hardening</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Control</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td><code>contextIsolation</code> / <code>nodeIntegration</code> / <code>sandbox</code></td><td><code>true</code> / <code>false</code> / <code>true</code> on the only <code>BrowserWindow</code></td></tr>
+        <tr><td>CSP</td><td>Strict, injected at build via the fail-closed tags API: <code>default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; …; object-src 'none'; base-uri 'none'</code> — the WASM allowance re-enables WebAssembly compilation only (the bundled highlighter's regex engine); JS <code>eval</code> stays blocked; no remote origin anywhere</td></tr>
+        <tr><td>Fonts</td><td>Self-hosted woff2 (OFL), zero CDN traffic</td></tr>
+        <tr><td><code>shell.openExternal</code></td><td><code>http/https/mailto</code> allowlist, both handlers; unparsable/other schemes dropped</td></tr>
+        <tr><td><code>will-navigate</code></td><td>Pinned to the app's own document + dev URL</td></tr>
+        <tr><td>Permissions</td><td>Deny-all <code>setPermissionRequestHandler</code> with a single allowlisted permission: <code>clipboard-sanitized-write</code> (copy buttons)</td></tr>
+        <tr><td>DevTools</td><td>Menu role omitted in packaged builds</td></tr>
+        <tr><td>IPC surface</td><td>Fixed-name channels; <strong>no renderer-named paths</strong>; export filenames sanitized</td></tr>
+        <tr><td>Custom protocol</td><td><code>tholos-asset://</code> resolves by exact DB id; responses carry <code>nosniff</code>, a <code>sandbox</code> CSP, and <code>no-store</code></td></tr>
+        <tr><td>Preload</td><td><code>contextBridge</code> wrappers only; <code>ipcRenderer</code> never exposed</td></tr>
+        <tr><td>Window creation</td><td><code>setWindowOpenHandler</code> denies all; navigation escapes go through the scheme allowlist</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s8">
+    <h2><span class="n">8</span> Findings register</h2>
+    <p>Severity is potential impact prior to mitigation. TM = threat-model objective.</p>
+    <h3>Remediated in the review</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>ID</th><th>Severity</th><th>Finding</th><th>Fix</th><th>TM</th></tr></thead>
+      <tbody>
+        <tr><td>R-1</td><td>Medium</td><td>No renderer CSP; Google Fonts fetched from CDN on every launch</td><td>Strict CSP injected at build; fonts vendored (woff2, OFL)</td><td>O3, O11</td></tr>
+        <tr><td>R-2</td><td>Medium</td><td><code>shell.openExternal</code> accepted any scheme from content-supplied URLs</td><td><code>http/https/mailto</code> allowlist in both nav handlers</td><td>O3</td></tr>
+        <tr><td>R-3</td><td>Low</td><td><code>will-navigate</code> allowed any <code>file:</code> URL</td><td>Pinned to the app's own document</td><td>O3</td></tr>
+        <tr><td>R-4</td><td>Medium</td><td>Build-time model download had no integrity check</td><td>SHA-256 pin table; downloads <em>and</em> cached files verified; unpinned = build failure</td><td>O9</td></tr>
+        <tr><td>R-5</td><td>Low</td><td>DevTools reachable in packaged builds</td><td>Menu role dev-only</td><td>O3</td></tr>
+        <tr><td>R-6</td><td>Low</td><td>No Chromium permission-request handler</td><td>Deny-all handler (single clipboard-write allowance)</td><td>O3</td></tr>
+        <tr><td>R-7</td><td>Low</td><td>GCM decipher didn't pin <code>authTagLength</code></td><td>Pinned to 16</td><td>O1</td></tr>
+        <tr><td>R-8</td><td>Medium</td><td>21 runtime-reachable dependency advisories; Electron behind a runtime-relevant patch</td><td>Security-floor overrides + Electron bump; <strong>1</strong> accepted advisory remains (sharp — see appendix)</td><td>O9</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Roadmap (tracked as GitHub issues)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>ID</th><th>Severity</th><th>Finding</th><th>TM</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>F-1</td><td><strong>High</strong></td><td>Unsigned installers; manually-published update feed; no asar tamper evidence — the top residual risk (#179)</td><td>O8, O9</td><td><span class="chip ok">Remediated</span> CI-built draft-staged releases; Authenticode signing via Azure Trusted Signing (OIDC, timestamped), fail-closed for tag builds; asar-integrity/fuse hardening. Residuals (O8 stays partial): Linux <code>.deb</code> unsigned with sha512 manifest from the same feed; no Linux asar validation; unpacked set covered by the installer signature</td></tr>
+        <tr><td>F-2</td><td>Medium</td><td>Crypto envelope: no version byte/stored KDF params, no AAD, plaintext residue after locking (#180)</td><td>O1</td><td><span class="chip ok">Remediated</span> envelope v2 (ADR-0019): version byte + stored bounded KDF params, address-binding AAD, verified residue scrub; v1 migrates on first unlock</td></tr>
+        <tr><td>F-3</td><td>Medium</td><td>MCP: bearer token plaintext on disk &amp; in UI; no per-tool-call audit log (#181)</td><td>O5, O6</td><td><span class="chip ok">Remediated</span> keychain-encrypted token, masked UI, append-only audit log</td></tr>
+        <tr><td>F-4</td><td>Low</td><td>Corpus walker follows symlinks — a link inside a registered tree can pull outside files into the index (#182)</td><td>O5</td><td><span class="chip ok">Remediated</span> symlinks never index + realpath containment</td></tr>
+        <tr><td>F-5</td><td>Low</td><td>sharp/libvips advisory pending a coordinated native bump; no Tholos code path feeds images to it</td><td>O9</td><td><span class="chip warn">Open</span></td></tr>
+      </tbody>
+    </table></div>
+    <h3>Accepted</h3>
+    <p>
+      Same-user loopback trust · stdio spawner trust · plaintext-by-design for unlocked content
+      and agent memory · <code>style-src 'unsafe-inline'</code> · dev-toolchain-only dependency
+      advisories · remote images blocked. Rationale for each in §3.5.
+    </p>
+  </section>
+
+  <section id="s9">
+    <h2><span class="n">9</span> Ongoing assurance</h2>
+    <ul>
+      <li><strong>Every PR</strong>: the full <code>node --test</code> suite (~790 tests) including deterministic <strong>property-fuzz suites</strong> — extractors (random bytes + mutated real documents), markdown render (no-executable-foothold + ReDoS bounds), crypto envelope (tamper totality), smart-paste, MCP endpoint (auth-before-parse, garbage tolerance) — plus a 30-second-per-target <strong>coverage-guided fuzz smoke</strong> (Jazzer.js/libFuzzer, seeded from real fixture documents).</li>
+      <li><strong>Nightly</strong>: 10 minutes of coverage-guided fuzzing per target; crashing inputs uploaded as reproducer artifacts, failures loud.</li>
+      <li><strong>Harness honesty</strong>: each harness was validated against a planted bug before being trusted; the planted-bug experiment also showed pure-random fuzzing misses narrow conditions that seeded mutation catches — which is why both tiers exist.</li>
+      <li><strong>Upstream fuzzing</strong>: the memory-unsafe parsing surfaces Tholos delegates to — PDFium and libvips — are continuously fuzzed on Google's OSS-Fuzz; Tholos's own parsers are memory-safe JS.</li>
+      <li><strong>Dependency hygiene, continuously</strong>: frozen lockfile in CI, 7-day cooling window, build-script approvals, guarded installs, <code>pnpm audit</code> with a written triage discipline.</li>
+    </ul>
+  </section>
+
+  <section id="s10">
+    <h2><span class="n">10</span> Appendices &amp; reporting</h2>
+    <ul>
+      <li><strong>Automated scan results &amp; triage</strong> — <code>docs/security/scans/README.md</code>: Semgrep (0 errors; every warning dispositioned), Electronegativity (no unmitigated checks), <code>pnpm audit</code> (1 accepted runtime advisory with exposure analysis).</li>
+      <li><strong>Manual QA checklist</strong> — six launch-the-app checks automation can't cover (offline fonts, dangerous-link inertness, DevTools absence, on-disk ciphertext inspection, MCP 401/allowlist behavior, model-digest tamper detection) — in the canonical markdown report.</li>
+    </ul>
+    <h3>Reporting a vulnerability</h3>
+    <p>
+      Please open a private security advisory on GitHub (Security → Advisories → &ldquo;Report a
+      vulnerability&rdquo;), or email the maintainer at
+      <a href="mailto:codypinto23@gmail.com">codypinto23@gmail.com</a>. Please do not open public
+      issues for suspected vulnerabilities. You can expect an acknowledgment within a week.
+    </p>
+  </section>
+
+  <footer>
+    <p>Rendered from <code>docs/security/security-review.md</code> (canonical) — review date 2026-08-15, finding statuses updated as remediations merge.</p>
+    <p>This page is self-contained by design: no external fonts, scripts, styles, or images.</p>
+  </footer>
+</main>
+</body>
+</html>
