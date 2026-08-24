@@ -167,6 +167,7 @@
     <h1>Security Review</h1>
     <div class="meta">
       <span><b>Version reviewed</b> post-hardening, 2026-08-15</span>
+      <span><b>Updated</b> 2026-08-24 — re-validated after the memory-integrity (ADR-0021) &amp; Savings Ledger (ADR-0022) campaigns</span>
       <span><b>Findings register</b> §8, statuses current</span>
       <span><b>Published copy</b> — canonical review maintained in the private Tholos source repo</span>
     </div>
@@ -213,10 +214,24 @@
     <ul>
       <li><strong>Runtime network egress is a single, well-defined channel</strong>: the update check against
         GitHub Releases. Nothing else in the packaged app touches the network — fonts are bundled,
-        embeddings run from a local model pinned offline, and there is no telemetry of any kind (§4.4).</li>
+        embeddings run from a local model pinned offline, and there is no telemetry of any kind.
+        Re-validated 2026-08-24 after the Savings Ledger shipped: still true as a claim about
+        <strong>network channels opened by application code</strong>, with a category distinction now stated
+        explicitly — <em>user-directed file writes</em> (export save dialogs; the opt-in scheduled
+        Savings Report) open no socket, though a user-chosen network-backed destination (a UNC
+        share) makes the OS carry that write over the network at the user's direction, and a synced
+        folder is moved afterwards by the user's own sync client. The safety property in every case
+        is that the written content is content-free by construction (§4.4).</li>
       <li><strong>The MCP surface satisfies Meta's Rule of Two</strong> with a structural argument, not a policy
         one: the server exposes zero network-capable and zero code-executing tools, so the
         &ldquo;external communication&rdquo; leg cannot be closed from inside Tholos (§5).</li>
+      <li><strong>The memory-poisoning channel (§5.4, F-3's residual) is no longer stealthy or
+        irreversible</strong> (ADR-0021): memory provenance is server-stamped evidence rather
+        than an agent claim, every agent Persona rewrite is snapshotted, flagged in the main window,
+        and restorable, memory/persona writes get the same external-link flagging as Pages,
+        forgetting is recoverable for 30 days, and recall returns as fenced stored data.
+        Persistence itself remains inherent to agent memory — the mitigations are attribution,
+        visibility, and recovery, not prevention (§5.4).</li>
       <li><strong>The cryptography is a small, sound core</strong>: AES-256-GCM + Argon2id at OWASP parameters,
         keys confined to main-process memory and zeroized; the improvements this review identified —
         envelope versioning, AAD address binding, residue scrubbing — are now implemented as
@@ -266,7 +281,9 @@
         <tr><td><code>tholos.db</code> (+ WAL)</td><td>Notes. Plaintext TEXT for normal sections; AES-256-GCM envelopes for Locked Sections</td><td>Encryption per section, opt-in (ADR-0004)</td></tr>
         <tr><td><code>settings.json</code></td><td>Preferences, window bounds, MCP config incl. bearer token</td><td>Token encrypted via OS credential store (F-3 remediated); rest plaintext</td></tr>
         <tr><td><code>corpora/</code></td><td>Vector index + registry of user-registered external repos/docs</td><td>Plaintext by design</td></tr>
-        <tr><td><code>memory/</code></td><td>Agent memories + persona</td><td>Plaintext by design, documented (ADR-0017)</td></tr>
+        <tr><td><code>memory/</code></td><td>Agent memories + persona, plus their integrity state: the one-deep Persona Snapshot (<code>persona.previous.md</code>), the rewrite-notice file, and forget tombstones (ADR-0021)</td><td>Plaintext by design (ADR-0017); writes integrity-guarded (ADR-0021)</td></tr>
+        <tr><td><code>savings-ledger.jsonl</code> (+ <code>.stdio</code> sibling, <code>.1</code> rotations)</td><td>Savings Ledger (ADR-0022): append-only record of <code>search_corpus</code> usage — counts, ids, latencies; never query text, chunk text, or file paths</td><td>Content-free by construction (named-field whitelist at write time)</td></tr>
+        <tr><td><code>mcp-audit.log</code></td><td>Per-call MCP audit trail (F-3): timestamp, transport, tool, target ids, outcome — never content</td><td>Content-free by construction</td></tr>
       </tbody>
     </table></div>
     <p>
@@ -285,11 +302,12 @@
         <tr><td>S1</td><td>Locked Section content (pages, attachments)</td><td>Highest — encrypted at rest, no recovery</td></tr>
         <tr><td>S2</td><td>Section passphrases &amp; derived keys</td><td>Highest — compromise breaks S1</td></tr>
         <tr><td>S3</td><td>Unlocked note content</td><td>High — user's working notes, plaintext on disk by design</td></tr>
-        <tr><td>S4</td><td>Agent memories &amp; persona</td><td>High — a distilled profile of the user, plaintext by design</td></tr>
+        <tr><td>S4</td><td>Agent memories &amp; persona (incl. the Persona Snapshot, rewrite-notice state, and forget tombstones)</td><td>High — a distilled profile of the user that re-enters agent context every later session, plaintext at rest by design; <em>write</em> integrity guarded since the memory-integrity campaign: provenance server-stamped, agent rewrites snapshotted + surfaced, forgetting recoverable (ADR-0021)</td></tr>
         <tr><td>S5</td><td>Indexed corpus content</td><td>Medium–high — mirrors external repos/docs the user registered</td></tr>
         <tr><td>S6</td><td>MCP bearer token</td><td>Medium — grants the full tool surface on loopback</td></tr>
         <tr><td>S7</td><td>Application/installer integrity (incl. update channel)</td><td>Critical — subverts everything above</td></tr>
         <tr><td>S8</td><td>Availability of the app and host</td><td>Medium</td></tr>
+        <tr><td>S9</td><td>Savings Ledger &amp; exported Savings Reports</td><td>Low — content-free by construction (schema whitelist at the write <strong>and</strong> export boundaries, no query/chunk text or paths, CSV formula injection neutralized, no dollar amounts stored; ADR-0022) — reveals only that/how often corpus search is used</td></tr>
       </tbody>
     </table></div>
 
@@ -320,7 +338,7 @@
       <li><span class="oid">O8</span><span class="chip warn">Partial</span><span class="otext">The auto-update channel must not allow substitution of a malicious installer. Met on Windows: HTTPS + sha512 pinning, CI-built draft-staged releases with signing mandatory for tag builds, Authenticode signing via Azure Trusted Signing (OIDC-federated, no exportable key). Weaker on Linux: the <code>.deb</code> carries no independent signature and its sha512 manifest ships from the same feed — feed compromise (A4) replaces both together. Documented F-1 residual.</span></li>
       <li><span class="oid">O9</span><span class="chip ok">Met</span><span class="otext">Code shipped to users must match reviewed source: sha512-integrity lockfile, 7-day cooling-off window, per-package build-script approvals, guarded installs, pinned model digests, and embedded asar integrity validation on Windows/macOS — the installer signature is the unpacked set's tamper evidence (F-1 remediated; Linux asar validation remains a documented gap).</span></li>
       <li><span class="oid">O10</span><span class="chip ok">Met</span><span class="otext">Parsers of untrusted bytes must not crash or hang the app, demonstrated continuously by two-tier fuzzing in CI — property suites on every PR plus coverage-guided nightly runs (§9).</span></li>
-      <li><span class="oid">O11</span><span class="chip ok">Met</span><span class="otext">User content must not leave the machine at runtime: zero runtime egress besides the update check — fonts self-hosted, embedding model bundled and pinned offline, no telemetry, remote images in notes blocked by CSP.</span></li>
+      <li><span class="oid">O11</span><span class="chip ok">Met</span><span class="otext">User content must not leave the machine at runtime: zero runtime egress besides the update check — fonts self-hosted, embedding model bundled and pinned offline, no telemetry, remote images in notes blocked by CSP. <em>User-directed file writes (§4.4) are outside this objective by definition — the user moves their own bytes; the Savings Report additionally carries no content (S9, ADR-0022).</em></span></li>
     </ul>
 
     <h3>3.4 Attack vectors → mitigations</h3>
@@ -328,9 +346,12 @@
       <thead><tr><th>Vector (attacker)</th><th>Mitigation</th><th>Where</th></tr></thead>
       <tbody>
         <tr><td>Markdown/HTML injection (A1)</td><td><code>html: false</code>, dangerous-scheme <code>validateLink</code>, strict CSP, fuzzed no-foothold invariant</td><td><code>markdown-render.mjs</code>; <code>test/fuzz-markdown.test.mjs</code></td></tr>
-        <tr><td>Malicious link click (A1)</td><td><code>http/https/mailto</code> allowlist on <code>shell.openExternal</code>; <code>file:</code> navigation pinned to the app document</td><td><code>src/main/open-external.mjs</code></td></tr>
+        <tr><td>Malicious link click (A1)</td><td><code>http/https/mailto</code> allowlist on <code>shell.openExternal</code>; <code>file:</code> navigation pinned to the app document; full-URL confirmation before any external open (default on)</td><td><code>src/main/open-external.mjs</code>; <code>external-link-confirmer.mjs</code></td></tr>
+        <tr><td>Planted exfiltration link → user click (A1→A6)</td><td>Click-time full-URL confirmation (the egress moment); agent-introduced links flagged on the page banner + counted (never URLs/hosts) in the audit log</td><td>ADR-0020; <code>extract-links.mjs</code>; F-6</td></tr>
         <tr><td>Malicious corpus document (A1)</td><td>Extension allowlist, size caps, zip-bomb/password/corrupt → classified skips, symlinks never index, macros never executed, extraction fuzzed; indexing isolated in a short-lived <code>utilityProcess</code></td><td><code>corpus-walk.mjs</code>; <code>index-worker.mjs</code></td></tr>
         <tr><td>Prompt injection → agent misuse (A1→A6)</td><td>Rule-of-Two structural argument (§5); per-section opt-in; Locked Sections keyless; undo snapshot + per-call audit log on agent writes</td><td><code>agent-gateway.mjs</code>; <code>audit-log.mjs</code></td></tr>
+        <tr><td>Memory/persona poisoning — injected content persisted as high-trust context (A1→A6)</td><td>Server-stamped origin (<code>'user'</code> reserved, stamped in main); one-deep Persona Snapshot + agent-rewrite notice (Settings + main-window banner, user-acts-only clearing); external-link flagging on every memory/persona write (count-only, invisible to the agent); 30-day forget tombstones; recall fenced as stored data</td><td>ADR-0021; <code>memory-gateway.mjs</code>; <code>memory-service.mjs</code>; F-3</td></tr>
+        <tr><td>Scheduled-export redirect — settings tamper or a planted symlink at the dated report filename (A2)</td><td>No privilege gained either way (same-user file write of a content-free report); target dir is main-dialog-chosen; the writer refuses a symlink at the target (parity with F-4's guard), turning a silent redirect into a visible failed status</td><td>§4.4; <code>savings-report.mjs</code></td></tr>
         <tr><td>Loopback port abuse / DNS rebinding (A2)</td><td>Bearer-before-dispatch (constant-time), loopback bind, <code>allowedHosts</code>/<code>allowedOrigins</code>, no CORS, 4&nbsp;MiB body cap</td><td><code>mcp-http-server.mjs</code></td></tr>
         <tr><td>Token theft from disk (A2)</td><td>Token encrypted via OS credential store; masked in UI with reveal-on-demand; per-call audit log</td><td>F-3 (remediated)</td></tr>
         <tr><td>Cold-disk reading (A3)</td><td>Locked Sections encrypted (O1); everything else plaintext <strong>by documented design</strong></td><td>ADR-0004/0017</td></tr>
@@ -349,6 +370,7 @@
       <li><strong>Build-time network is accepted; runtime network is not</strong> — model download and dependency installs happen at build, guarded by digests, lockfile integrity, and the cooling window.</li>
       <li><strong><code>style-src 'unsafe-inline'</code></strong> remains in the CSP (React/CodeMirror inline styles); <code>script-src</code> is strict, which is where execution risk lives.</li>
       <li><strong>Remote images in notes no longer load</strong> (CSP) — a deliberate tracking-pixel defense, at the cost of remote-image convenience.</li>
+      <li><strong>User-directed file writes are the user's egress, not the app's</strong> — export destinations are chosen in native dialogs (the scheduled export's directory once, in main's dialog); a synced destination is moved afterwards by the user's own sync client, and a network-share destination is carried by the OS filesystem layer at the user's direction — the app opens no socket either way. Controls and residuals are assessed in §4.4.</li>
     </ul>
   </section>
 
@@ -414,6 +436,55 @@
       model; there is no telemetry, crash reporting, or analytics; the MCP server <em>listens</em> on
       loopback and originates nothing.
     </p></div>
+    <p>
+      <em>Re-validated 2026-08-24 (issue #242), after the Savings Ledger campaign (ADR-0022)
+      added file exports.</em> The one-channel claim remains literally true — nothing in ADR-0022's
+      feature family opens a socket. But the claim is about <strong>runtime network egress</strong>, and that
+      category deserves an explicit boundary against a second, distinct category the app has always
+      had: <strong>user-directed file writes</strong>. Tholos writes files at user-chosen locations —
+      the markdown export and the manual Savings Report export (native save dialogs), and the
+      <em>recurring</em> scheduled Savings Report export (#213) into a directory chosen once in main's
+      native dialog. The one-channel claim is therefore scoped precisely: it inventories
+      <strong>network channels opened by application code</strong> — Tholos opens no socket and holds no
+      network credential for any export. A chosen destination can still make bytes leave the
+      machine, in two mechanically different ways: a <strong>synced folder</strong> is written locally and a
+      separate sync client — the user's own infrastructure — moves the bytes afterwards; a
+      <strong>UNC or mapped network path</strong> makes the OS filesystem layer (e.g. the SMB redirector,
+      using the user's own session credentials) carry Tholos's write over the network as it
+      happens. Both are user-directed egress through paths the user aimed the app at — exactly
+      what the choose-time hint below surfaces — not app-originated channels; neither adds a
+      socket to the inventory above. For the Savings Report the safety property is <strong>not the
+      path but the construction</strong>: content-free by a schema whitelist enforced at the write
+      boundary (<code>savings-ledger.mjs</code>, named fields only) <em>and again</em> at the export boundary
+      (<code>savings-report.mjs</code>: events rebuilt from named fields, client strings re-sanitized,
+      CSV formula injection neutralized, no dollar amounts) — pinned by tests.
+    </p>
+    <p>Export-path residuals, assessed (decisions from #242, both implemented):</p>
+    <ul>
+      <li><strong><code>settings.json</code> tamper redirecting the scheduled write</strong> — no privilege gained
+        (an attacker with that write access can already write any same-user file; what lands is a
+        content-free report); the Settings status line names the path actually written. Accepted
+        (A2 sits inside the trust boundary, §3.5).</li>
+      <li><strong>Symlink/junction at the target — guard implemented (parity with the F-4 corpus-walk
+        guard)</strong>: the scheduled writer refuses to write through a symlink planted at its
+        predictable dated filename (<code>assertNotSymlinkTarget</code>, lstat-based,
+        <code>savings-report.mjs</code>; tested). No privilege was gained by the redirect either, but the
+        scheduled write is <em>recurring and unattended</em> — the guard turns a silent redirect into a
+        visible failed status line at one lstat of cost. The chosen directory may itself be a
+        symlink/junction (user intent — the registered-root rule the corpus walker also applies),
+        and the manual export stays unguarded on purpose (its exact path is blessed in the save
+        dialog, overwrite prompt included). The lstat→write gap is an accepted same-user TOCTOU
+        residual.</li>
+      <li><strong>Fixed dated filename, overwrite semantics</strong> — a same-day rerun overwrites that day's
+        <code>tholos-savings-report-&lt;date&gt;.json</code>. Deliberate: each file is a full-history snapshot,
+        so the overwritten content is always a strictly older snapshot of the same ledger.</li>
+      <li><strong>UNC/sync-folder hint — implemented (#242)</strong>: choosing a target that is a UNC path or
+        sits under a well-known sync root (OneDrive, Dropbox, Google Drive, iCloud, Box,
+        Nextcloud/ownCloud, Seafile, Syncthing) shows a one-line, non-blocking heads-up at
+        folder-choose time — &ldquo;reports written here leave this machine via your own share/sync&rdquo;
+        (<code>exportDirHint</code>). Inform, never refuse: scheduling to a share is the intended
+        enterprise flow, and the report is content-free either way.</li>
+    </ul>
   </section>
 
   <section id="s5">
@@ -426,12 +497,21 @@
       An injected agent can corrupt what it can write (mitigated by undo snapshots, the audit
       log, and opt-in scope) but cannot use Tholos as an exfiltration or execution channel.
     </p>
+    <p>
+      One caveat the tool-shaped argument doesn't cover, closed as <strong>F-6</strong> (ADR-0020):
+      persisted <em>content</em> is a deferred channel — an injected agent can write a link whose URL
+      encodes note data (<code>https://…?d=…</code>, <code>mailto:?body=…</code>) into a Page and wait for a
+      human click. Mitigated at the actual egress moment: every external open shows the full URL in an
+      in-app confirmation (default on) before the OS is invoked, and agent writes that introduce new
+      external links are flagged on the page banner and counted (count only, never URLs or hosts) in
+      the audit log.
+    </p>
     <h3>5.1 Transports</h3>
     <ul>
       <li><strong>Streamable HTTP (recommended)</strong> — in-process, <code>127.0.0.1</code> only, single <code>/mcp</code> POST endpoint. Gates, in order: bearer token (256-bit random, constant-time compare, 401 before any parsing), DNS-rebinding protection, no CORS, 4&nbsp;MiB body cap, stateless per-request server instances. Off by default; every tool call lands in the append-only audit log.</li>
       <li><strong>stdio (legacy/fallback)</strong> — a separate process registered via <code>claude mcp add</code>; trusts its spawner (accepted risk §3.5) and receives a <em>smaller</em> surface: no memory tools, no reindex.</li>
     </ul>
-    <h3>5.2 Complete tool inventory (17 HTTP / 10 stdio)</h3>
+    <h3>5.2 Complete tool inventory (18 HTTP / 10 stdio)</h3>
     <div class="tbl"><table>
       <thead><tr><th>Tool</th><th>Reads</th><th>Writes</th><th>FS beyond <code>&lt;userData&gt;</code></th><th>Exec</th><th>Network</th></tr></thead>
       <tbody>
@@ -439,12 +519,12 @@
         <tr><td><code>read_page</code></td><td>Full body, Agent-Access sections only</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td><code>create_section</code></td><td>—</td><td>New section (auto-granted Agent Access — noted risk)</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td><code>create_page</code>, <code>rename_page</code></td><td>Parent checks</td><td>Page rows; rename requires <code>expectedUpdatedAt</code></td><td>no</td><td>no</td><td>no</td></tr>
-        <tr><td><code>update_page</code></td><td>—</td><td>Whole-body replace; prior body kept as an undo snapshot surfaced in the UI</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>update_page</code></td><td>—</td><td>Whole-body replace; prior body kept as an undo snapshot surfaced in the UI; new external links flagged (banner + audit count, F-6)</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td><code>list_corpora</code></td><td>Registry names/status (never the source path)</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td><code>search_corpus</code></td><td>Vector+FTS query over an indexed corpus</td><td>—</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td><code>reindex_corpus</code> (HTTP only)</td><td>—</td><td>Rebuilds a corpus index</td><td>reads the <strong>user-registered</strong> source dir, via a bounded worker fork</td><td>fixed bundled worker only</td><td>no</td></tr>
-        <tr><td><code>save_memory</code>, <code>search_memory</code>, <code>list_memories</code>, <code>forget_memory</code> (HTTP only)</td><td>Memory store</td><td>Memory store (length-capped)</td><td>no</td><td>no</td><td>no</td></tr>
-        <tr><td><code>read_persona</code>, <code>update_persona</code> (HTTP only)</td><td><code>persona.md</code></td><td>Whole-doc rewrite, 64&nbsp;KiB cap, optimistic concurrency</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>save_memory</code>, <code>search_memory</code>, <code>list_memories</code>, <code>update_memory</code>, <code>forget_memory</code> (HTTP only)</td><td>Memory store; recall fenced as stored data (ADR-0021)</td><td>Memory store (length-capped); origin server-stamped (<code>'user'</code> reserved); external links counted into the audit log; forget is a 30-day tombstone, restorable in Settings</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td><code>read_persona</code>, <code>update_persona</code> (HTTP only)</td><td><code>persona.md</code>, fenced as stored data</td><td>Whole-doc rewrite, 64&nbsp;KiB cap, optimistic concurrency; rolls the one-deep Persona Snapshot and raises the user-cleared rewrite notice + main-window banner (ADR-0021)</td><td>no</td><td>no</td><td>no</td></tr>
       </tbody>
     </table></div>
     <p>No resources, no prompts, no sampling capability — tools only.</p>
@@ -458,10 +538,11 @@
     </ul>
     <h3>5.4 Candid limitations (all registered)</h3>
     <ul>
-      <li><strong>Memory/persona persistence is a prompt-injection channel</strong>: content laundered from an untrusted corpus into <code>save_memory</code> re-enters context in later sessions. Bounded by size caps, the off-by-default toggle, the Memory UI making entries visible/deletable, and the audit trail.</li>
+      <li><strong>Memory/persona persistence is a prompt-injection channel — by design, and it remains one</strong>: content laundered from an untrusted corpus into <code>save_memory</code> still persists and still re-enters context in later sessions; that is what agent memory <em>is</em>, and no mitigation prevents the write or the recall. What the memory-integrity campaign (ADR-0021) closed is the channel's <strong>forgeability, invisibility, and irreversibility</strong> — attribution, visibility, and recovery, not prevention: <strong>provenance is server-stamped</strong> (each write path stamps its own caller's identity in main; <code>'user'</code> is a reserved origin an agent cannot claim, a smuggled <code>origin</code> argument is silently corrected — the Settings audit surface shows evidence, not claims); <strong>agent Persona rewrites are recoverable and visible</strong> (one-deep Persona Snapshot rolled inside the concurrency guard; an accumulated rewrite notice in Settings <em>and</em> as a main-window banner, cleared only by user acts — an injected agent cannot neutralize its own flag); <strong>memory/persona writes get the F-6 link flagging</strong> (the ADR-0020 scanner in strict plain-text mode — code fences exempt nothing — counted into the audit log, invisible to the agent); <strong>forgetting is recoverable</strong> (30-day tombstone with Restore; &ldquo;Clear all&rdquo; stays immediate); and <strong>recall is fenced</strong> (results lead with a structural stored-data notice plus per-item provenance). Residuals: the persistence and recall themselves remain — accepted, bounded by the off-by-default opt-in, size caps, and the visibility and recovery above; pre-campaign memories keep whatever origin they were saved with; no per-memory review banner (durable audit evidence only); fencing is advisory — the load-bearing mitigations are provenance, versioning, and visibility.</li>
       <li><code>create_section</code> self-grants Agent Access to sections the agent itself creates — a bounded, visible expansion.</li>
       <li>Corpus chunk text is returned verbatim, unfenced — injection-aware clients should treat it as data.</li>
       <li>Where no OS keychain exists (a bare Linux session), bearer-token storage falls back to plaintext — surfaced in Settings, not silent.</li>
+      <li><strong>Persisted links are a deferred egress channel</strong> (F-6, ADR-0020): closed at click time (full-URL confirmation, default on) and made visible at write time (banner + audit count). The same flagging now covers memory and persona writes (ADR-0021) — in a strict plain-text scan mode, so a code fence is not a bypass. Residuals: the preference can be deliberately turned off; a lookalike URL still relies on the user reading the dialog.</li>
     </ul>
   </section>
 
@@ -543,9 +624,10 @@
       <tbody>
         <tr><td>F-1</td><td><strong>High</strong></td><td>Unsigned installers; manually-published update feed; no asar tamper evidence — the top residual risk (#179)</td><td>O8, O9</td><td><span class="chip ok">Remediated</span> CI-built draft-staged releases; Authenticode signing via Azure Trusted Signing (OIDC, timestamped), fail-closed for tag builds; asar-integrity/fuse hardening. Residuals (O8 stays partial): Linux <code>.deb</code> unsigned with sha512 manifest from the same feed; no Linux asar validation; unpacked set covered by the installer signature</td></tr>
         <tr><td>F-2</td><td>Medium</td><td>Crypto envelope: no version byte/stored KDF params, no AAD, plaintext residue after locking (#180)</td><td>O1</td><td><span class="chip ok">Remediated</span> envelope v2 (ADR-0019): version byte + stored bounded KDF params, address-binding AAD, verified residue scrub; v1 migrates on first unlock</td></tr>
-        <tr><td>F-3</td><td>Medium</td><td>MCP: bearer token plaintext on disk &amp; in UI; no per-tool-call audit log (#181)</td><td>O5, O6</td><td><span class="chip ok">Remediated</span> keychain-encrypted token, masked UI, append-only audit log</td></tr>
+        <tr><td>F-3</td><td>Medium</td><td>MCP: bearer token plaintext on disk &amp; in UI; no per-tool-call audit log; memory/persona as persistent injection channel (#181, #215)</td><td>O5, O6</td><td><span class="chip ok">Remediated</span> keychain-encrypted token, masked UI, append-only audit log (#181). The remaining leg — the memory/persona injection channel — hardened by the memory-integrity campaign (ADR-0021), which closed its forgeability, invisibility, and irreversibility (persistence itself is inherent to agent memory and remains accepted-with-mitigations, §5.4): server-stamped origin with <code>'user'</code> reserved; Persona Snapshot rolled inside the concurrency guard; plain-text-mode link flagging counted into the audit log; 30-day forget tombstones with Restore; agent-rewrite notice + main-window banner, user-acts-only clearing; recall fenced with per-item provenance. Residuals in §5.4</td></tr>
         <tr><td>F-4</td><td>Low</td><td>Corpus walker follows symlinks — a link inside a registered tree can pull outside files into the index (#182)</td><td>O5</td><td><span class="chip ok">Remediated</span> symlinks never index + realpath containment</td></tr>
         <tr><td>F-5</td><td>Low</td><td>sharp/libvips advisory pending a coordinated native bump; no Tholos code path feeds images to it</td><td>O9</td><td><span class="chip warn">Open</span></td></tr>
+        <tr><td>F-6</td><td>Medium</td><td>Agent-authored exfiltration links: an injected agent writes a URL encoding note data into a Page; a later user click is the egress. Closed by click-time full-URL confirmation (default on, nonce-gated in main) + write-time flagging (banner "added N external links"; audit count only — never URLs or hosts). ADR-0020; residuals documented (preference disableable; lookalike URLs); the memory/persona-unflagged residual was closed by the memory-integrity campaign (ADR-0021) — the same scanner covers memory/persona writes in strict plain-text mode.</td><td>O5</td><td><span class="chip ok">Remediated</span></td></tr>
       </tbody>
     </table></div>
     <h3>Accepted</h3>
@@ -571,7 +653,7 @@
     <h2><span class="n">10</span> Appendices &amp; reporting</h2>
     <ul>
       <li><strong>Automated scan results &amp; triage</strong> — <code>docs/security/scans/README.md</code>: Semgrep (0 errors; every warning dispositioned), Electronegativity (no unmitigated checks), <code>pnpm audit</code> (1 accepted runtime advisory with exposure analysis).</li>
-      <li><strong>Manual QA checklist</strong> — six launch-the-app checks automation can't cover (offline fonts, dangerous-link inertness, DevTools absence, on-disk ciphertext inspection, MCP 401/allowlist behavior, model-digest tamper detection) — in the canonical markdown report.</li>
+      <li><strong>Manual QA checklist</strong> — nine launch-the-app checks automation can't cover (offline fonts, link-confirmation dialog + dangerous-link inertness, agent-link flagging, DevTools absence, on-disk ciphertext inspection, MCP 401/allowlist behavior, model-digest tamper detection, scheduled-export content-free/symlink-refusal/sync-hint behavior, memory origin-stamp + persona-rewrite banner) — in the canonical markdown report.</li>
     </ul>
     <h3>Reporting a vulnerability</h3>
     <p>
@@ -583,7 +665,7 @@
   </section>
 
   <footer>
-    <p>Published from the security review maintained in the private Tholos source repository — review date 2026-08-15, finding statuses updated as remediations merge.</p>
+    <p>Published from the security review maintained in the private Tholos source repository — review date 2026-08-15, re-validated 2026-08-24 (memory-integrity &amp; Savings Ledger campaigns); finding statuses updated as remediations merge.</p>
     <p>This page is self-contained by design: no external fonts, scripts, styles, or images.</p>
   </footer>
 </main>
